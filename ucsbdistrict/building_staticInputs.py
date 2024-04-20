@@ -11,7 +11,6 @@ class BuildingParameters(BaseModel):
     CHW_supplyLosses : int  
     CHW_deltaT_Max : int  
     CHW_deltaT_Min : int  
-    CHW_maxLoad : float
     HHW_supply_Temps :pd.Series
     HHW_return_Temps :pd.Series
     HHW_BldgSTP : pd.Series 
@@ -20,10 +19,9 @@ class BuildingParameters(BaseModel):
     buildingDate : pd.Series
     hotWaterMonths : np.ndarray
     # DHW_indices : pd.Series
-    DHWmaxLoad : float
     DHWmaxApproach : int  
     DHWminApproach : int  
-    DHWloadMinApproach : float
+    
     
             
     class MySeries(BaseModel):

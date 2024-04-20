@@ -28,6 +28,9 @@ class Building(BaseModel):
     # districtHWRT : pd.Series
     # HWSequalHWR : pd.Series
     timeStamp : pd.Series 
+    CHW_maxLoad : float
+    DHW_maxLoad : float
+    DHW_loadMinApproach : float
     
 
 
@@ -56,7 +59,7 @@ class Building(BaseModel):
     @computed_field(return_type=MySeries)
     @property
     def CHWRT(self) -> pd.Series:
-        return self.loopCHWST+((self.parameters.CHW_deltaT_Max-self.parameters.CHW_deltaT_Min)/self.parameters.CHW_maxLoad\
+        return self.loopCHWST+((self.parameters.CHW_deltaT_Max-self.parameters.CHW_deltaT_Min)/self.CHW_maxLoad\
                               )*self.coolingLoad+self.parameters.CHW_deltaT_Min
     
     @computed_field(return_type=MySeries)
@@ -109,9 +112,9 @@ class Building(BaseModel):
     @property
     def DHWRT(self):
         DHWRT = self.DHWtemp + np.maximum(self.parameters.DHWminApproach, (self.parameters.DHWmaxApproach-self.parameters.DHWminApproach)/\
-                                               (1-self.parameters.DHWloadMinApproach/self.parameters.DHWmaxLoad)*self.DHWLoad/self.parameters.DHWmaxLoad\
+                                               (1-self.DHW_loadMinApproach/self.DHW_maxLoad)*self.DHWLoad/self.DHW_maxLoad\
                                                +self.parameters.DHWmaxApproach-(self.parameters.DHWmaxApproach-self.parameters.DHWminApproach)/\
-                                               (1-self.parameters.DHWloadMinApproach/self.parameters.DHWmaxLoad))
+                                               (1-self.DHW_loadMinApproach/self.DHW_maxLoad))
         return DHWRT
     
     @computed_field(return_type=MySeries)
@@ -152,9 +155,12 @@ class Building(BaseModel):
         # Create a list of unique identifiers for each row (e.g., row numbers)
         index_list = range(len(self.loopHWST))  # Assuming you want to use row numbers
 
-        df_data = pd.DataFrame({
+        df = pd.DataFrame({
             "caan_no":self.caan_no,
             "Time Stamp" : self.timeStamp,
+            "Space Heating Load (Btu/h)":self.heatingLoad,
+            "DHW Load (Btu/h)":self.DHWLoad,
+            "Cooling Load (Btu/h)":self.coolingLoad,
             'Loop HWST @ Building (°F)': self.loopHWST,
             'Loop CHWST @ Building (°F)': self.loopCHWST,
             'CHWRT (°F)': self.CHWRT,
@@ -175,7 +181,7 @@ class Building(BaseModel):
         
         
 
-        # Create the DataFrame with the index
-        df = pd.DataFrame(df_data, index=index_list)
+        # # Create the DataFrame with the index
+        # df = pd.DataFrame(df_data, index=index_list)
 
         return df
