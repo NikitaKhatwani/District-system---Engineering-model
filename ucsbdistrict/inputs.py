@@ -151,6 +151,7 @@ def calculate_inputs(CUP_inputs,building_inputs,TES_inputs,hotWater_schedule3_in
     hot_radius = TES_inputs["Tank Properties"]["TES Hot Diameter"]/2
     hot_height = TES_inputs["Tank Properties"]["TES Hot Height"]
     TES_inputs["Tank Properties"]["TES Hot Tank Volume"]= math.pi * (hot_radius ** 2) * hot_height * CUFtoGAL
+    print("inputs",TES_inputs["Tank Properties"]["TES Hot Tank Volume"])
     cold_radius = TES_inputs["Tank Properties"]["TES Cold Diameter"]/2
     cold_height = TES_inputs["Tank Properties"]["TES Cold Height"]
     TES_inputs["Tank Properties"]["TES Cold Tank Volume"]= math.pi * (cold_radius ** 2) * cold_height * CUFtoGAL
@@ -235,6 +236,8 @@ ocean_df = pd.read_excel('Ocean temp.xlsx')
 #import heat pump data 
 heatPump_df = pd.read_excel('CO2 heat pump details.xlsx')
 
+#import Date and Time
+dateTime_df = pd.read_excel("Date and Time.xlsx")
 
 buildingModule_inputs =  pd.DataFrame()
 districtModule_inputs = pd.DataFrame()
@@ -247,9 +250,10 @@ hotWaterMonths = hotWater_schedule3_inputs_df["Schedules Month"].values
 hotWaterSetpointCUP = hotWater_schedule3_inputs_df["CUP"].values
 
 
-# Extract month from building_module_df
-weather_df['Date'] = pd.to_datetime(weather_df['Date'], unit='D')
-month_to_match = weather_df['Date'].dt.month.values
+# Extract month from weather date time column
+dateTime_df['Date and Time'] = pd.to_datetime(dateTime_df['Date and Time'], unit='D')
+dateTime = dateTime_df['Date and Time']
+month_to_match = dateTime_df['Date and Time'].dt.month.values
 
 # Find the index where month matches
 HW_indices = np.where(month_to_match[:, None] == hotWaterMonths )[1]
@@ -276,3 +280,12 @@ CH_indices = np.where(month_to_match[:, None] == chilledWaterMonths)[1]
 # Get the corresponding value from hotWaterSetpoint column
 districtModule_inputs["Loop CHW STP (°F)"]  = chilledWaterSetpointBldg[CH_indices]
 
+# Extract columns from input_fields_df
+coldWaterMonths = chilledCTOcean_schedule5_inputs_df.loc[chilledCTOcean_schedule5_inputs_df["Schedules Category"]=="Chilled Water Setpoint","Month"].values
+coldWaterSetpointCUP = chilledCTOcean_schedule5_inputs_df.loc[chilledCTOcean_schedule5_inputs_df["Schedules Category"]=="Chilled Water Setpoint","CUP"].values
+
+# Find the index where month matches
+CHW_indices = np.where(month_to_match[:, None] == coldWaterMonths )[1]
+
+# Get the corresponding value from hotWaterSetpoint column
+districtModule_inputs["District CHW STP (°F)"]  = coldWaterSetpointCUP[CHW_indices]

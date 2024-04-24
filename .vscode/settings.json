@@ -1,6 +1,5 @@
 {
-    "python.autoComplete.extraPaths": [
-        
-    ],
-    "terminal.integrated.env.windows": {}
+    "terminal.integrated.env.windows": {
+        "PYTHONPATH":"${workspaceFolder}/ucsbdistrict"
+    }
 }

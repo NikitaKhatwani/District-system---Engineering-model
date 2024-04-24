@@ -29,8 +29,7 @@ class heatPump(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    # def CHWST(self):
-    #     HP_enteringHW - districtHWRT
+
 
 
     def min_diff(self, data: pd.Series, target: pd.Series) -> int:

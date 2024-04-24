@@ -10,23 +10,8 @@ class Building(BaseModel):
     caan_no: int
     name: str
     coolingLoad: pd.Series
-    # loopHWST: pd.Series
-    # loopCHWST: pd.Series
-    # CHWRT : pd.Series
-    # CHWRflow : pd.Series
-    # min_index : pd.Series
-    # HHWRT:pd.Series
     heatingLoad : pd.Series
-    # HHWRflow : pd.Series
-    # DHWtemp : pd.Series
     DHWLoad : pd.Series
-    # DHWRT : pd.Series
-    # DHWRflow : pd.Series
-    # districtHWSflow: pd.Series
-    # bypassHHWS : pd.Series
-    # HWRflow : pd.Series
-    # districtHWRT : pd.Series
-    # HWSequalHWR : pd.Series
     timeStamp : pd.Series 
     CHW_maxLoad : float
     DHW_maxLoad : float
@@ -72,7 +57,6 @@ class Building(BaseModel):
     def min_index(self):
         # Convert data_series and target_series to NumPy arrays for numerical operations
         data_values = self.parameters.HHW_supply_Temps.values
-#         print("hi",self.HHWstp)
         target_values = self.parameters.HHW_BldgSTP.values
         
         # Reshape self.data to (1, 4) to broadcast across self.target
