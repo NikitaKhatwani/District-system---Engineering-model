@@ -8,6 +8,7 @@ import numpy as np
 class heatPump(BaseModel):
     districtHWRT : pd.Series
     districtCHWRT : pd.Series
+    districtHWSflow : pd.Series
     HW_districtSTP : pd.Series
     HP_leavingHW : pd.Series
     HP_enteringHW : pd.Series
@@ -15,6 +16,11 @@ class heatPump(BaseModel):
     HP_leavingCHW : pd.Series
     HP_maxHeating : pd.Series
     HP_maxCooling : pd.Series
+    TES_H_shiftChargeRate : pd.Series
+    TES_H_flowOut : pd.Series
+    HP_heatingCapacity :float
+    HP_coolingCapacity : float
+
 
     
 
@@ -52,7 +58,7 @@ class heatPump(BaseModel):
         # min_index = pd.Series(min_index)  
         return (diff,np.min(diff,axis=1))
 
-
+    #the following three functions were giving wierd indices,check code
     @computed_field(return_type=MySeries)
     @property 
     def CHWST(self):
@@ -68,7 +74,7 @@ class heatPump(BaseModel):
         matching_indices = np.where((diff_HW_HWRT==min_diff_HW_HWRT[:,np.newaxis])&(diff_CHW_CHWRT==min_diff_CHW_CHWRT[:,np.newaxis])& (rereshaped_HP_leavingHW == HW_districtSTP))[1]
         # Get the corresponding value from AE based on the matching index
         final_value = self.HP_leavingCHW[matching_indices] if matching_indices.size > 0 else None
-        return final_value
+        return final_value.reset_index(drop=True)
 
 
     @computed_field(return_type=MySeries)
@@ -82,7 +88,8 @@ class heatPump(BaseModel):
         HW_districtSTP = self.HW_districtSTP.values.reshape((-1, 1))
         matching_indices = np.where((diff_HW_HWRT==min_diff_HW_HWRT[:,np.newaxis])&(diff_CHW_CHWRT==min_diff_CHW_CHWRT[:,np.newaxis])& (rereshaped_HP_leavingHW == HW_districtSTP))[1]
         final_value = self.HP_maxHeating[matching_indices] if matching_indices.size > 0 else None
-        return final_value
+        return final_value.reset_index(drop=True)
+    
     
     @computed_field(return_type=MySeries)
     @property 
@@ -94,7 +101,7 @@ class heatPump(BaseModel):
         HW_districtSTP = self.HW_districtSTP.values.reshape((-1, 1))
         matching_indices = np.where((diff_HW_HWRT==min_diff_HW_HWRT[:,np.newaxis])&(diff_CHW_CHWRT==min_diff_CHW_CHWRT[:,np.newaxis])& (rereshaped_HP_leavingHW == HW_districtSTP))[1]
         final_value = self.HP_maxCooling[matching_indices] if matching_indices.size > 0 else None
-        return final_value
+        return final_value.reset_index(drop=True)
     
     @computed_field(return_type=MySeries)
     @property 
@@ -103,16 +110,42 @@ class heatPump(BaseModel):
         return self.heatingOutput/self.coolingOutput
     
 
+    @computed_field(return_type=MySeries)
+    @property 
+    def reqHeatingOutput(self):
+        value1 = (self.districtHWSflow+self.TES_H_shiftChargeRate - self.TES_H_flowOut)*500*(self.HW_districtSTP-self.districtHWRT)
+        minimum = pd.Series(np.minimum(value1, self.HP_heatingCapacity))
+        print("value1",value1,"self.HP_heatingCapacity",self.HP_heatingCapacity)
+        return minimum
+        
+    @computed_field(return_type=MySeries)
+    @property 
+    def possRecoveredCHW(self):
+        value1 = self.reqHeatingOutput/self.heatCoolRatio[0]
+        print("cc",self.heatCoolRatio[0])
+        print("xx",self.heatCoolRatio[0].dtype)
+        print("ccc",value1,type(self.reqHeatingOutput[0]),type(self.heatCoolRatio[0]))
+        return pd.Series(np.minimum(value1,self.HP_coolingCapacity))
 
+
+    @computed_field(return_type=MySeries)
+    @property 
+    def possRecoveredCHWFLow(self):
+        return self.possRecoveredCHW/500/(self.districtCHWRT-self.CHWST)
 
     def compute(self):
 
         df = pd.DataFrame({
-            "HP CHWST (°F)" : self.CHWST.reset_index(drop=True),
-            "Max Unitary Heating Output (Btu/h)": self.heatingOutput.reset_index(drop=True),
-            "Max Unitary Cooling Output (Btu/h)":self.coolingOutput.reset_index(drop=True),
-            "Heat:Cool": self.heatCoolRatio.reset_index(drop=True),
-
+            "HP CHWST (°F)" : self.CHWST,
+            "Max Unitary Heating Output (Btu/h)": self.heatingOutput,
+            "Max Unitary Cooling Output (Btu/h)":self.coolingOutput,
+            "Heat:Cool": self.heatCoolRatio,
+            "Required Heating Output (Btu/h)": self.reqHeatingOutput,
+            "HWSFLow":self.districtHWSflow,
+            "self.HW_districtSTP":self.HW_districtSTP,
+            "self.districtHWRT":self.districtHWRT,
+            "Possible Recovered CHW (Btu/h)": self.possRecoveredCHW,
+            "Possible Recovered CHW (gpm)":self.possRecoveredCHWFLow,
         })
 
         return df

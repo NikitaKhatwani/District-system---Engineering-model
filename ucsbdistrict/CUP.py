@@ -151,6 +151,7 @@ class CUP(BaseModel):
         value = tank_schedule.loc[tank_schedule["Month"]== month,"Total"]
         return value.iloc[0]
 
+
     @computed_field(return_type=MySeries)
     @property    
     def HL_totalShiftHours(self):
