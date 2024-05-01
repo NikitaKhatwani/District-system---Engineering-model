@@ -254,6 +254,7 @@ hotWaterSetpointCUP = hotWater_schedule3_inputs_df["CUP"].values
 dateTime_df['Date and Time'] = pd.to_datetime(dateTime_df['Date and Time'], unit='D')
 dateTime = dateTime_df['Date and Time']
 month_to_match = dateTime_df['Date and Time'].dt.month.values
+days_to_match = dateTime_df['Date and Time'].dt.day.values
 
 # Find the index where month matches
 HW_indices = np.where(month_to_match[:, None] == hotWaterMonths )[1]
