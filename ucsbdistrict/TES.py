@@ -39,15 +39,12 @@ class TES(BaseModel):
     CHW_lowerTankTemp : float
     CHW_upperTankTemp : float
 
-
     #HP
     HP_possRecCHW : pd.Series = None
     HP_CHWST : pd.Series  = None
 
     #TES
     TES_hotCapacityHr : pd.Series = None
-
-    conversion_galToLbs : float
 
 
     class MySeries(BaseModel):
@@ -168,7 +165,14 @@ class TES(BaseModel):
 
         return value
 
-
+        # # Use numpy.select to assign results based on conditions``
+        # result_series =   # Initialize result series with NA
+        # result_series[condition_hold] = "Hold"
+        # result_series[condition_charge] = "Charge"
+        # result_series[~self.CUP_output_df["Hot Load Shift Charging"]] = "Discharge"
+        
+        # return result_series
+        # # return self.CUP_output_df["Hot Load Shift Charging"]
 
 
     # @computed_field(return_type=MySeries)   
@@ -291,16 +295,11 @@ class TES(BaseModel):
 
 
     def TES_H_tc_F(self,index,TES_H_flowOut,TES_H_temp_tc,hotThafterLoss_return):
-        print("TES_H_temp_tc",TES_H_temp_tc,TES_H_flowOut,hotThafterLoss_return)
         if TES_H_flowOut[index] > 0:
-            # print(type(TES_H_flowOut),type(TES_H_temp_tc),type(hotThafterLoss_return),type(self.districtHWRT))
+            print(type(TES_H_flowOut),type(TES_H_temp_tc),type(hotThafterLoss_return),type(self.districtHWRT))
             return (TES_H_temp_tc[index]*hotThafterLoss_return[index]+self.districtHWRT[index]*TES_H_flowOut[index]*60)/(hotThafterLoss_return[index]+TES_H_flowOut[index]*60)
         else:
             return TES_H_temp_tc[index]
-
-
-
-
 
 
 
@@ -320,9 +319,7 @@ class TES(BaseModel):
             TES_H_capacity = pd.Series(self.TES_H_capacity(0,TES_H_th))
             TES_H_Th_F=pd.Series(self.TES_H_Th_F(0,TES_H_flowInto,TES_H_temp,hotThafterLoss_supply))
             TES_H_temp_tc = pd.Series(self.HW_lowerTankTemp)
-            print("TES_H_temp_tc",TES_H_temp_tc,TES_H_flowOut,hotThafterLoss_return)
             TES_H_tc_F = pd.Series(self.TES_H_tc_F(0,TES_H_flowOut,TES_H_temp_tc,hotThafterLoss_return))
-
 
 
             for index in range(1,5):
@@ -371,9 +368,11 @@ class TES(BaseModel):
             },index = list(range(8760))
 )     
 
+            
+
+
+
             return df3
-
-
 
 
 
@@ -546,7 +545,21 @@ class TES(BaseModel):
         return (value1 - value2)
 
 
+    # def TES_H_capacity(self,index,TES_H_th):
+    #     try:
+    #         result = TES_H_th[index]/self.HW_TankVol
+    #     except ValueError:
+    #         result = 0
+    #     return result
 
+
+    # def TES_H_Th_F(self,index,TES_H_flowInto,TES_H_temp,hotThafterLoss_supply):
+    #     if TES_H_flowInto[index]==0:
+    #         x = TES_H_temp[index]*hotThafterLoss_supply[index]+self.HW_districtSTP[index]*TES_H_temp[index]*60
+    #         y = hotThafterLoss_supply[index]+TES_H_temp[index]*60
+    #         return x/y
+    #     else:
+    #         return TES_H_temp[index]
 
 
     def TES_C_tc_F(self,index,TES_C_flowInto,TES_C_temp,coldThafterLoss_return):
@@ -558,7 +571,7 @@ class TES(BaseModel):
         
 
     def TES_C_capacity(self,index,TES_C_tc_F,TES_C_tc):
-        # print("trial",TES_C_tc_F[index],self.CHW_lowerTankTemp,TES_C_tc[index],self.CHW_TankVol)
+        print("trial",TES_C_tc_F[index],self.CHW_lowerTankTemp,TES_C_tc[index],self.CHW_TankVol)
         try:
             epsilon = 1e-6  # Adjust epsilon based on your tolerance requirement
             if abs(TES_C_tc_F[index] - self.CHW_lowerTankTemp) <= epsilon:
@@ -570,14 +583,12 @@ class TES(BaseModel):
             result = 0
         return result
 
-
-    def TES_C_th_F(self,index,TES_C_flowInto,TES_C_previousHour_th,coldThafterLoss_supply):
-        if TES_C_flowInto[index]<0:
-            value1 = TES_C_previousHour_th[index]*coldThafterLoss_supply[index]-(self.districtCHWRT*TES_C_flowInto[index]*60)
-            value2 = coldThafterLoss_supply[index]-TES_C_flowInto[index]*60
-            return value1/value2
-        else:
-            return TES_C_previousHour_th[index]
+    # def TES_H_capacity(self,index,TES_H_th):
+    #     try:
+    #         result = TES_H_th[index]/self.HW_TankVol
+    #     except ValueError:
+    #         result = 0
+    #     return result
 
 
 
@@ -603,8 +614,6 @@ class TES(BaseModel):
                 TES_C_tc =pd.Series(self.TES_C_tc(0,coldThafterLoss_return,TES_C_flowInto,TES_C_flowOut))
                 TES_C_tc_F = pd.Series(self.TES_C_tc_F(0,TES_C_flowInto,TES_C_temp,coldThafterLoss_return))
                 TES_C_capacity = pd.Series(self.TES_C_capacity(0,TES_C_tc_F,TES_C_tc))
-                TES_C_previousHour_th = pd.Series(self.CHW_upperTankTemp)
-                TES_C_th_F = pd.Series(self.TES_C_th_F(0,TES_C_flowInto,TES_C_previousHour_th,coldThafterLoss_supply))
 
                 for index in range(1,5):
 
@@ -628,12 +637,19 @@ class TES(BaseModel):
                     TES_C_tc[index] = self.TES_C_tc(index,coldThafterLoss_return,TES_C_flowInto,TES_C_flowOut)
                     TES_C_tc_F[index] = self.TES_C_tc_F(index,TES_C_flowInto,TES_C_temp,coldThafterLoss_return)
                     TES_C_capacity[index] = self.TES_C_capacity(index,TES_C_tc_F,TES_C_tc)
-                    TES_C_previousHour_th[index]=TES_C_th_F[index-1]
-                    TES_C_th_F[index] = self.TES_C_th_F(index,TES_C_flowInto,TES_C_previousHour_th,coldThafterLoss_supply)
+
+
+                    # hotLoadShiftChargeRate[index] = self.hotLoadShiftChargeRate(index,hotStatus,hotThermocline,hotThafterLoss_return)
+                    # TES_H_flowInto[index] = self.TES_H_flowInto(index,hotStatus,hotLoadShiftChargeRate)
+                    # TES_H_temp[index] = TES_H_Th_F[index-1]
+                    # TES_H_flow[index] = self.TES_H_flow(index,TES_H_temp)
+                    # TES_H_flowOut[index] = self.TES_H_flowOut(index,TES_H_flow,hotThafterLoss_supply,hotStatus)
+                    # TES_H_th[index] = self.TES_H_th(index,hotThafterLoss_supply,TES_H_flowInto,TES_H_flowOut)
+                    # TES_H_tc[index] =self.TES_H_tc(index,hotThafterLoss_return,TES_H_flowInto,TES_H_flowOut)
+                    # TES_H_capacity[index] = self.TES_H_capacity(index,TES_H_th)
+                    # TES_H_Th_F[index]=self.TES_H_Th_F(index,TES_H_flowInto,TES_H_temp,hotThafterLoss_supply)
                     
 
-                    
-                    
 
                 df4 = pd.DataFrame({
                 "TES Cold Capacity hr-1 (%)": coldCapacityHr,
@@ -643,8 +659,13 @@ class TES(BaseModel):
                 "TES Cold Charge Window Adjustment":coldCharge_window,
                 "TES Cold Status": coldStatus,
                 "Cold Load-Shift Charge Rate (gpm)":coldLoadShiftChargeRate,
+                # "Flow into TES Hot Th (gpm)":TES_H_flowInto,
                 "TES Cold Tc Previous Hour (°F)":TES_C_temp ,
                 "TES Flow to meet Campus Heating (gpm)":TES_C_flow,
+                # "Flow out of TES Hot Th (gpm)" : TES_H_flowOut,
+                # "TES Hot Th (°F)":TES_H_Th_F,
+                # "TES Hot Capacity (%)" : TES_H_capacity,
+                # "districtHWRT":self.districtHWRT
                 "HP Flow to meet Campus Cooling (gpm)": HP_C_flow,
                 "Flow into TES Cold Tc (gpm)": TES_C_flowInto,
                 "Flow out of TES Cold Tc (gpm)":TES_C_flowOut,
@@ -652,9 +673,9 @@ class TES(BaseModel):
                 "TES Cold Tc (Gal)": TES_C_tc,
                 "TES Cold Tc (°F)": TES_C_tc_F,
                 "TES Cold Capacity (%)" : TES_C_capacity,
-                "TES Cold Th (°F)":TES_C_th_F,
-                "TES Cold Th Previous Hour (°F)": TES_C_previousHour_th,
-
+                # "TES Cold Th after losses (Gal)_supply temp": self.coldThafterLoss_supply,
+                # "TES Cold Tc after losses (Gal)_return temp":self.coldThafterLoss_return,
+                # "TES Cold Thermocline (Gal)": self.coldThermocline,
                 },index = list(range(8760))
     )     
 
@@ -663,244 +684,3 @@ class TES(BaseModel):
 
 
                 return df4
-    
-
-
-############################### hot and cold output df####################################
-
-    @computed_field(return_type=MySeries)   
-    @property
-    def hot_df(self):
-        hot_output_df = self.TES_H_calculate()
-        return hot_output_df
-    
-
-    @computed_field(return_type=MySeries)   
-    @property
-    def cold_df(self):
-        cold_output_df = self.TES_C_calculate()
-        return cold_output_df
-
-
-################################## Remaining columns ########################################
-
-    @computed_field(return_type=MySeries)   
-    @property
-    def hot_binaryStatus(self):
-        return np.where(self.hot_df["TES Hot Status"]=="Discharge",1,0)
-    
-
-    @computed_field(return_type=MySeries)   
-    @property
-    def cold_binaryStatus(self):
-        return np.where(self.cold_df["TES Cold Status"]=="Discharge",1,0)
-
-
-    @computed_field(return_type=MySeries)   
-    @property
-    def H_tempOut(self):
-
-        # Convert input lists to NumPy arrays for vectorized operations
-        AL = np.array(self.hot_df["TES Hot Status"])
-        AB = np.array(self.hot_df["TES Hot Th after losses (Gal)_supply temp"])
-        AS = np.array(self.hot_df["Flow out of TES Hot Th (gpm)"])
-        T = np.array(self.hot_df["TES Hot Th Previous Hour (°F)"])
-        AD = np.array(self.hot_df["TES Hot Tc after losses (Gal)_return temp"])
-        AR = np.array(self.hot_df["Flow into TES Hot Th (gpm)"])
-        U = np.array(self.hot_df["TES Hot Tc Previous Hour(°F)"])
-        
-        # Initialize result array with zeros
-        result = np.zeros_like(AL, dtype=float)
-        
-        # Calculate for "Discharge" condition
-        discharge_condition = (AL == "Discharge")
-        AB_discharge = AB[discharge_condition]
-        AS_discharge = AS[discharge_condition]
-        T_discharge = T[discharge_condition]
-        
-        try:
-            result[discharge_condition] = np.where(
-                AB_discharge > AS_discharge * 60,
-                T_discharge,
-                ((AS_discharge * 60 - AB_discharge) * ((T_discharge + U[discharge_condition]) / 2) + AB_discharge * T_discharge) / (AS_discharge * 60)
-            )
-        except ZeroDivisionError:
-            result[discharge_condition] = T_discharge
-        
-        # Calculate for "Charge" condition
-        charge_condition = (AL == "Charge")
-        AD_charge = AD[charge_condition]
-        AR_charge = AR[charge_condition]
-        U_charge = U[charge_condition]
-        
-        try:
-            result[charge_condition] = np.where(
-                AD_charge > AR_charge * 60,
-                U_charge,
-                ((AR_charge * 60 - AD_charge) * ((T[charge_condition] + U_charge) / 2) + AD_charge * U_charge) / (AR_charge * 60)
-            )
-        except ZeroDivisionError:
-            result[charge_condition] = U_charge
-        
-        return result
-
-
-
-
-    @computed_field(return_type=MySeries)   
-    @property
-    def H_energyOut(self):
-        # =(O3-P3)*500*AR3-(AT3-P3)*500*AS3
-        value1 = self.HW_districtSTP-self.districtHWRT 
-        value2 = self.H_tempOut-self.districtHWRT 
-        result_series = value1*500*self.hot_df["Flow into TES Hot Th (gpm)"]-value2*500*self.hot_df["Flow out of TES Hot Th (gpm)"]
-        return result_series
-    
-
-    @computed_field(return_type=MySeries)   
-    @property
-    def C_tempOut(self):
-
-        # Convert input lists to NumPy arrays for vectorized operations
-        AO = np.array(self.cold_df["TES Cold Status"])
-        AG = np.array(self.cold_df["TES Cold Tc after losses (Gal)_return temp"])
-        AW = np.array(self.cold_df["Flow out of TES Cold Tc (gpm)"])
-        W = np.array(self.cold_df["TES Cold Tc Previous Hour (°F)"])
-        AE = np.array(self.cold_df["TES Cold Th after losses (Gal)_supply temp"])
-        AV = np.array(self.cold_df["Flow into TES Cold Tc (gpm)"])
-        V = np.array(self.cold_df["TES Cold Th Previous Hour (°F)"])
-
-
-
-        # # Initialize result array with zeros
-        # result = np.zeros_like(AO, dtype=float)
-        
-        # # Calculate for "Discharge" condition
-        # discharge_mask = (AO == "Discharge")
-        # AB_discharge = AG[discharge_mask]
-        # AS_discharge = AW[discharge_mask]
-        # T_discharge = W[discharge_mask]
-        
-        # ##formula seems off here
-        # try:
-        #     result[discharge_mask] = np.where(
-        #         AB_discharge > AS_discharge * 60,
-        #         T_discharge,
-        #         ((AS_discharge * 60 - AB_discharge) * ((T_discharge + V[discharge_mask]) / 2) + AB_discharge * T_discharge) / (AS_discharge * 60)
-        #     )
-        # except ZeroDivisionError:
-        #     result[discharge_mask] = T_discharge
-        
-        # # Calculate for "Charge" condition
-        # charge_mask = (AO == "Charge")
-        # AD_charge = AE[charge_mask]
-        # AR_charge = AV[charge_mask]
-        # U_charge = V[charge_mask]
-        
-        # try:
-        #     result[charge_mask] = np.where(
-        #         AD_charge > AR_charge * 60,
-        #         U_charge,
-        #         ((AR_charge * 60 - AD_charge) * ((V[charge_mask] + U_charge) / 2) + AD_charge * U_charge) / (AR_charge * 60)
-        #     )
-        # except ZeroDivisionError:
-        #     result[charge_mask] = U_charge
-        
-        # return result
-    
-
-        # Initialize result array with zeros
-        result = np.zeros_like(AO, dtype=float)
-        
-        # Calculate for "Discharge" condition
-        discharge_mask = (AO == "Discharge")
-        AG_discharge = AG[discharge_mask]
-        AW_discharge = AW[discharge_mask]
-        W_discharge = W[discharge_mask]
-        V_discharge = V[discharge_mask]
-
-        try:
-            result[discharge_mask] = np.where(
-                AG_discharge > AW_discharge * 60,
-                W_discharge,
-                ((AW_discharge * 60 - AG_discharge) * (np.mean([V_discharge, W_discharge])) + AG_discharge * W_discharge) / (AW_discharge * 60)
-            )
-        except ZeroDivisionError:
-            result[discharge_mask] = W_discharge
-
-        # Calculate for "Charge" condition
-        charge_mask = (AO == "Charge")
-        AE_charge = AE[charge_mask]
-        AV_charge = AV[charge_mask]
-        V_charge = V[charge_mask]
-        W_charge = W[charge_mask]
-
-        try:
-            result[charge_mask] = np.where(
-                AE_charge > AV_charge * 60,
-                V_charge,
-                ((AV_charge * 60 - AE_charge) * (np.mean([V_charge, W_charge])) + AE_charge * V_charge) / (AV_charge * 60)
-            )
-        except ZeroDivisionError:
-            result[charge_mask] = V_charge
-
-        return result
-
-
-    @computed_field(return_type=MySeries)   
-    @property
-    def C_energyOut(self):
-        value1 = (self.districtCHWRT-self.HP_CHWST)*500*self.cold_df["Flow into TES Cold Tc (gpm)"]
-        value2 = (self.districtCHWRT-self.C_tempOut)*500*self.cold_df["Flow out of TES Cold Tc (gpm)"]
-        return value1-value2
-
-
-        
-    @computed_field(return_type=MySeries)   
-    @property
-    def TES_H_thermocline(self):
-         return self.HW_TankVol-self.hot_df["TES Hot Th (Gal)"]-self.hot_df["TES Hot Tc (Gal)"]
-
-    @computed_field(return_type=MySeries)   
-    @property
-    def TES_H_capacityKbtu(self):
-        # =('Input Fields'!$G$39*BB3*(AZ3-P3)/1000)
-        value = self.hot_df["TES Hot Th (Gal)"]* (self.hot_df["TES Hot Th (°F)"]- self.districtHWRT)
-        return self.conversion_galToLbs*value/1000
-
-    @computed_field(return_type=MySeries)   
-    @property
-    def TES_C_capacityKbtu(self):
-        value = self.cold_df["TES Cold Tc (Gal)"]* (self.districtCHWRT-self.cold_df["TES Cold Tc (°F)"])
-        return self.conversion_galToLbs*value/1000
-    
-
-    @computed_field(return_type=MySeries)   
-    @property
-    def check(self):
-        return self.hot_df["Flow into TES Hot Th (gpm)"]*self.hot_df["Flow out of TES Hot Th (gpm)"]+self.cold_df["Flow into TES Cold Tc (gpm)"]*self.cold_df["Flow out of TES Cold Tc (gpm)"]
-
-
-    
-    def TES_HC_calculate(self):
-
-                df5 = pd.DataFrame({
-                "TES Hot Binary Status": self.hot_binaryStatus,
-                "TES Cold Binary Status" : self.cold_binaryStatus,
-                "Temp out of Hot Tank (°F)" : self.H_tempOut,
-                "Energy out of Hot Tank (Btus)": self.H_energyOut,
-                "Temp out of Cold Tank (°F)": self.C_tempOut,
-                "Energy out of Cold Tank (Btus)"  : self.C_energyOut,
-                # "TES Hot Tc (°F)": self.TES_H_tc_F,
-                "TES Hot Thermocline (Gal)": self.TES_H_thermocline,
-                "TES Hot Capacity (kBtu)": self.TES_H_capacityKbtu,
-                "TES Cold Capacity (kBtu)": self.TES_C_capacityKbtu,
-                "check":self.check,
-
-
-                },index = list(range(8760))
-    )     
-
-                return df5
-    
-
