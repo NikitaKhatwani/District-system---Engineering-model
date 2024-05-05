@@ -31,11 +31,7 @@ class building_mixing(BaseModel):
     def totalDHW_load(self):
         return self.df.groupby('Time Stamp')['DHW Load (Btu/h)'].sum()
     
-    @computed_field(return_type=MySeries) 
-    @property
-    def totalHeating_load(self):
-        return self.totalSpaceHeating_load + self.totalDHW_load
-    
+
 
     @computed_field(return_type=MySeries) 
     @property
@@ -51,6 +47,8 @@ class building_mixing(BaseModel):
         bldgHWRTxHWSflow = self.df['District HWRT (°F)']*self.df['District HWS Flow (gpm)']
         districtHWRT = (bldgHWRTxHWSflow.groupby(self.df['Time Stamp']).sum())/self.districtHWSflow
         return  pd.Series(np.where(districtHWSflow_is_zero, 0,districtHWRT))
+
+
 
 
     @computed_field(return_type=MySeries) 
@@ -74,6 +72,14 @@ class building_mixing(BaseModel):
         return pd.Series(result, index=districtCHWRT.index)
         
 
+
+    @computed_field(return_type=MySeries) 
+    @property
+    def totalHeating_load(self):
+        return self.districtHWSflow*500*(self.parameters.HW_LoopSTP-self.districtHWRT)
+    
+
+
     @computed_field(return_type=MySeries) 
     @property
     def totalCooling_load(self):
@@ -81,6 +87,7 @@ class building_mixing(BaseModel):
         districtCHWRT = self.districtCHWRT.reset_index(drop=True)
         return districtCHWSflow*(districtCHWRT-self.parameters.CHW_LoopSTP)*500
         # return self.districtCHWSflow*(self.districtCHWRT-self.parameters.CHW_LoopSTP)*500
+
 
 
 
