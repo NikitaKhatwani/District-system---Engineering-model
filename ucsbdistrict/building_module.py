@@ -44,8 +44,8 @@ class Building(BaseModel):
     @computed_field(return_type=MySeries)
     @property
     def CHWRT(self) -> pd.Series:
-        return self.loopCHWST+((self.parameters.CHW_deltaT_Max-self.parameters.CHW_deltaT_Min)/self.CHW_maxLoad\
-                              )*self.coolingLoad+self.parameters.CHW_deltaT_Min
+        return (self.loopCHWST+((self.parameters.CHW_deltaT_Max-self.parameters.CHW_deltaT_Min)/self.CHW_maxLoad\
+                              )*self.coolingLoad)+self.parameters.CHW_deltaT_Min
     
     @computed_field(return_type=MySeries)
     @property
@@ -124,7 +124,8 @@ class Building(BaseModel):
     @computed_field(return_type=MySeries)
     @property
     def districtHWRT(self):
-        return (self.HHWRT*(self.HHWRflow-self.bypassHHWS)+self.DHWRflow*self.DHWRT)/self.districtHWSflow
+        print(self.HHWRT[0],self.HHWRflow[0],self.bypassHHWS[0],self.DHWRflow[0],self.DHWRT[0],self.districtHWSflow[0],self.parameters.HW_supplyLosses)
+        return ((self.HHWRT*(self.HHWRflow-self.bypassHHWS)+self.DHWRflow*self.DHWRT)/self.districtHWSflow)+self.parameters.HW_returnLosses
     
     @computed_field(return_type=MySeries)
     @property

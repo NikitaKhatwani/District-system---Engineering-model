@@ -76,7 +76,11 @@ class building_mixing(BaseModel):
     @computed_field(return_type=MySeries) 
     @property
     def totalHeating_load(self):
-        return self.districtHWSflow*500*(self.parameters.HW_LoopSTP-self.districtHWRT)
+        
+        districtHWSflow = self.districtHWSflow.reset_index(drop=True)
+        districtHWRT = self.districtHWRT.reset_index(drop=True)
+        print ("ck",self.districtHWSflow,self.parameters.HW_LoopSTP,self.districtHWRT)
+        return districtHWSflow*500*(self.parameters.HW_LoopSTP-districtHWRT)
     
 
 
@@ -97,11 +101,11 @@ class building_mixing(BaseModel):
         df = pd.DataFrame({
             "Total Space Heating Load (Btu/h)" : self.totalSpaceHeating_load.reset_index(drop=True),
             "Total DHW Load (Btu/h)" : self.totalDHW_load.reset_index(drop=True),
-            "Total Heating Load (Btu/h)" : self.totalHeating_load.reset_index(drop=True),
             "District HWS Flow (gpm)": self.districtHWSflow.reset_index(drop=True),
             "District HWRT (°F)":self.districtHWRT.reset_index(drop=True),
             "District CHWS Flow (gpm)":self.districtCHWSflow.reset_index(drop=True),
             "District CHWRT (°F)":self.districtCHWRT.reset_index(drop=True),
+            "Total Heating Load (Btu/h)" : self.totalHeating_load.reset_index(drop=True),
             "Total Cooling Load (Btu/h)": self.totalCooling_load
         })
 

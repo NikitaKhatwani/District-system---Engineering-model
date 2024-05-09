@@ -21,6 +21,7 @@ class BuildingParameters(BaseModel):
     # DHW_indices : pd.Series
     DHWmaxApproach : int  
     DHWminApproach : int  
+    HW_returnLosses : int
     
     
             

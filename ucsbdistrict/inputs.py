@@ -151,7 +151,7 @@ def calculate_inputs(CUP_inputs,building_inputs,TES_inputs,hotWater_schedule3_in
     hot_radius = TES_inputs["Tank Properties"]["TES Hot Diameter"]/2
     hot_height = TES_inputs["Tank Properties"]["TES Hot Height"]
     TES_inputs["Tank Properties"]["TES Hot Tank Volume"]= math.pi * (hot_radius ** 2) * hot_height * CUFtoGAL
-    print("inputs",TES_inputs["Tank Properties"]["TES Hot Tank Volume"])
+    
     cold_radius = TES_inputs["Tank Properties"]["TES Cold Diameter"]/2
     cold_height = TES_inputs["Tank Properties"]["TES Cold Height"]
     TES_inputs["Tank Properties"]["TES Cold Tank Volume"]= math.pi * (cold_radius ** 2) * cold_height * CUFtoGAL

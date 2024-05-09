@@ -228,7 +228,7 @@ class heatPump(BaseModel):
         HW_indices = np.where(self.month_to_match[:, None] == self.gr_months.values )[1]
         # print("llll",HW_indices)
         #Get the corresponding value from hotWaterSetpoint column
-        return self.grReturn_D_LWT[HW_indices].reset_index(drop=True)
+        return (self.grReturn_HtRej_LWT[HW_indices]+0.0001).reset_index(drop=True)
     
 
     @computed_field(return_type=MySeries)
