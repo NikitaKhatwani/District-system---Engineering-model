@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import os
 import statsmodels.api as sm
+from functools import reduce
 
 from ucsbdistrict.inputs import dateTime,weather_df
 
@@ -211,345 +212,526 @@ for file in files:
 
 
 
-    ############# Current District Therm Op loads #############
-    building_meta_df = pd.read_excel("Building_MetaData_.xlsx",header=1)
-    current_district_therm_loads = pd.DataFrame()
-    year = 2045
+############# Current District Therm Op loads #############
+building_meta_df = pd.read_excel("Building_MetaData_.xlsx",header=1)
+current_district_therm_loads = pd.DataFrame()
+year = 2045
 
+# Define a function to check conditions for each building
+def meets_district_cooling_conditions(row):
+    condition = (
+        year >= row["First Year Active"] and
+        year <= row["Last Year Active"] and
+        year < row["Year of Decarb"] and
+        row["Current District Cooling Y/N?"] == "Y"
+    )
+    return condition
 
-    # Define a function to check conditions for each building
-    def meets_district_cooling_conditions(row):
-        condition = (
-            year >= row["First Year Active"] and
-            year <= row["Last Year Active"] and
-            year < row["Year of Decarb"] and
-            row["Current District Cooling Y/N?"] == "Y"
-        )
-        return condition
-    
-    # Define a function to check conditions for each building
-    def meets_district_heating_conditions(row):
-        condition = (
-            year >= row["First Year Active"] and
-            year <= row["Last Year Active"] and
-            year < row["Year of Decarb"] and
-            row["Current District Heating Y/N?"] == "Y"
-        )
-        return condition
-    
-        # Define a function to check conditions for each building
-    def meets_district_DHW_conditions(row):
-        condition = (
-            year >= row["First Year Active"] and
-            year <= row["Last Year Active"] and
-            year < row["Year of Decarb"] and
-            row["Current District Hot Water Y/N?"] == "Y"
-        )
-        return condition
-    
-    def filtered_bldg(building_meta_df,allBldg_output,meets_conditions1,meets_conditions2,meets_conditions3,meets_conditions4,df,type,usage,units):
-        # cooling filter 
-        # Apply the condition check to filter buildings
-        filtered_buildings_cooling = building_meta_df.apply(meets_conditions1, axis=1)
-
-        # Extract the Building ID CAAN values of buildings that meet the conditions
-        filtered_building_ids_cooling = building_meta_df.loc[filtered_buildings_cooling, "Building ID CAAN"].tolist()
-
-        # Filter cooling loads for buildings that meet the conditions
-        filtered_loads_usage_cooling = allBldg_output[allBldg_output["Building ID CAAN"].isin(filtered_building_ids_cooling)]
-        print("filtered_building_ids_cooling ",filtered_buildings_cooling)
-        print("filtered_loads_usage_cooling ",filtered_loads_usage_cooling)
-        # heating filter 
-        filtered_buildings_heating = building_meta_df.apply(meets_conditions2, axis=1)
-
-        # Extract the Building ID CAAN values of buildings that meet the conditions
-        filtered_building_ids_heating = building_meta_df.loc[filtered_buildings_heating, "Building ID CAAN"].tolist()
-
-        # Filter cooling loads for buildings that meet the conditions
-        filtered_loads_usage_heating = allBldg_output[allBldg_output["Building ID CAAN"].isin(filtered_building_ids_heating)]
-
-        # DHW filter
-        filtered_buildings_DHW = building_meta_df.apply(meets_conditions3, axis=1)
-
-        # Extract the Building ID CAAN values of buildings that meet the conditions
-        filtered_building_ids_DHW = building_meta_df.loc[filtered_buildings_DHW, "Building ID CAAN"].tolist()
-
-        # Filter cooling loads for buildings that meet the conditions
-        filtered_loads_usage_DHW = allBldg_output[allBldg_output["Building ID CAAN"].isin(filtered_building_ids_DHW)]
-
-        # Other filter
-        filtered_buildings_other = building_meta_df.apply(meets_conditions4, axis=1)
-
-        # Extract the Building ID CAAN values of buildings that meet the conditions
-        filtered_building_ids_other = building_meta_df.loc[filtered_buildings_other, "Building ID CAAN"].tolist()
-
-        # Filter cooling loads for buildings that meet the conditions
-        filtered_loads_usage_other = allBldg_output[allBldg_output["Building ID CAAN"].isin(filtered_building_ids_other)]
-
-        # Sum the cooling loads across all hours for these buildings
-        if usage == "Load (kBtu)":
-            df[f"Current {type} Cooling {usage}"] = filtered_loads_usage_cooling.groupby(allBldg_output['Timestamp'])["Cooling Load (kbtu)"].sum()
-            df[f"Current {type} Heating {usage}"] = filtered_loads_usage_heating.groupby(allBldg_output['Timestamp'])["Heating Load (kbtu)"].sum()
-            df[f"Current {type} Hot Water {usage}"] = filtered_loads_usage_DHW.groupby(allBldg_output['Timestamp'])["Hot Water Load (kbtu)"].sum()
-            if type != "District":
-                df[f"Current {type} Cooking {usage}"] = filtered_loads_usage_other.groupby(allBldg_output['Timestamp'])["Cooking Load (kbtu)"].sum()
-                df[f"Current {type} Laundry {usage}"] = filtered_loads_usage_other.groupby(allBldg_output['Timestamp'])["Laundry Load (kbtu)"].sum()
-        else:
-            df[f"Current {type} Heating {usage}"] = filtered_loads_usage_heating.groupby(allBldg_output['Timestamp'])[f"Heating {units}"].sum()
-            df[f"Current {type} Hot Water {usage}"] = filtered_loads_usage_DHW.groupby(allBldg_output['Timestamp'])[f"Hot Water {units}"].sum()
-            df[f"Current {type} Cooking {usage}"] = filtered_loads_usage_other.groupby(allBldg_output['Timestamp'])[f"Cooking {units}"].sum()
-            df[f"Current {type} Laundry {usage}"] = filtered_loads_usage_other.groupby(allBldg_output['Timestamp'])[f"Laundry {units}"].sum()
-            df[f"Current {type} Other Process {usage}"] = filtered_loads_usage_other.groupby(allBldg_output['Timestamp'])[f"Other Process {units}"].sum()
-            if usage == "Electricity Use (kWh)":
-                    df[f"Current {type} Cooling {usage}"] = filtered_loads_usage_cooling.groupby(allBldg_output['Timestamp'])["Cooling (kWh)"].sum()
-
-
-        # Reset the index to move timestamp back as a column and reset to default integer index
-        df.reset_index(inplace=True)
-        df["Ambient Air Wet Bulb Temp (F)"] = weather_df["Wet Bulb Temp (°F)"]
-        return df
-    
-    current_district_therm_loads=filtered_bldg(building_meta_df,allBldgLoads_output,meets_district_cooling_conditions,meets_district_heating_conditions,meets_district_DHW_conditions,meets_district_DHW_conditions,current_district_therm_loads, "District","Load (kBtu)","(kBtu)")
-
-
-
-    ################# bldg loads and usage #####################
-    
-
-    # empty frame
-    current_bldg_therm_loads = pd.DataFrame()
-    current_bldg_elec_use = pd.DataFrame()
-    current_bldg_gas_use = pd.DataFrame()
-    new_bldg_therm_loads = pd.DataFrame()
-
-
-    ########### building conditions #########################
-    # Define a function to check conditions for each building
-    def meets_building_cooling_conditions(row):
-        condition = (
-            year >= row["First Year Active"] and
-            year <= row["Last Year Active"] and
-            year < row["Year of Decarb"] and
-            row["Current District Cooling Y/N?"] == "N"
-        )
-        return condition
-    
-    # Define a function to check conditions for each building
-    def meets_building_heating_conditions(row):
-        condition = (
-            year >= row["First Year Active"] and
-            year <= row["Last Year Active"] and
-            year < row["Year of Decarb"] and
-            row["Current District Heating Y/N?"] == "N"
-        )
-        return condition
-    
-        # Define a function to check conditions for each building
-    def meets_building_DHW_conditions(row):
-        condition = (
-            year >= row["First Year Active"] and
-            year <= row["Last Year Active"] and
-            year < row["Year of Decarb"] and
-            row["Current District Hot Water Y/N?"] == "N"
-        )
-        return condition
-    
-    def meets_building_other_conditions(row):
-        condition = (
-            year >= row["First Year Active"] and
-            year <= row["Last Year Active"] and
-            year < row["Year of Cooking and Laundry Decarb"] 
-        )
-        return condition
-        
-    print("allBldgGasUse_output",allBldgGasUse_output)
-    current_Bldg_Therm_Op_Loads=filtered_bldg(building_meta_df,allBldgLoads_output,meets_building_cooling_conditions,meets_building_heating_conditions,meets_building_DHW_conditions,meets_building_other_conditions,current_bldg_therm_loads,"Building Equipment","Load (kBtu)","(kBtu)")
-    Current_Bldg_Equip_Elec_Use=filtered_bldg(building_meta_df,allBldgElecUse_output,meets_building_cooling_conditions,meets_building_heating_conditions,meets_building_DHW_conditions,meets_building_other_conditions,current_bldg_elec_use, "Building Equipment","Electricity Use (kWh)","(kWh)")
-    Current_Bldg_Equip_Gas_Use=filtered_bldg(building_meta_df,allBldgGasUse_output,meets_building_cooling_conditions,meets_building_heating_conditions,meets_building_DHW_conditions,meets_building_other_conditions,current_bldg_gas_use, "Building Equipment","Gas Use (therms)","(Therms)")
+# Define a function to check conditions for each building
+def meets_district_heating_conditions(row):
+    condition = (
+        year >= row["First Year Active"] and
+        year <= row["Last Year Active"] and
+        year < row["Year of Decarb"] and
+        row["Current District Heating Y/N?"] == "Y"
+    )
+    return condition
 
     # Define a function to check conditions for each building
-    def meets_new_building_conditions(row):
-        condition = (
-            year >= row["First Year Active"] and
-            year <= row["Last Year Active"] and
-            year >= row["Year of Decarb"] and
-            row["Decarbonization Type (New Building Heat Pumps vs. New CUP)"] == "New Building Heat Pumps"
-        )
-        return condition
+def meets_district_DHW_conditions(row):
+    condition = (
+        year >= row["First Year Active"] and
+        year <= row["Last Year Active"] and
+        year < row["Year of Decarb"] and
+        row["Current District Hot Water Y/N?"] == "Y"
+    )
+    return condition
+
+def filtered_bldg_sum(building_meta_df,allBldg_output,meets_conditions1,meets_conditions2,meets_conditions3,meets_conditions4,df,type,usage,units):
+    # cooling filter 
+    # Apply the condition check to filter buildings
+    filtered_buildings_cooling = building_meta_df.apply(meets_conditions1, axis=1)
+
+    # Extract the Building ID CAAN values of buildings that meet the conditions
+    filtered_building_ids_cooling = building_meta_df.loc[filtered_buildings_cooling, "Building ID CAAN"].tolist()
+
+    # Filter cooling loads for buildings that meet the conditions
+    filtered_loads_usage_cooling = allBldg_output[allBldg_output["Building ID CAAN"].isin(filtered_building_ids_cooling)]
+    print("type",type)
+    print("usage",usage)
+    print("filtered_building_ids_cooling ",filtered_building_ids_cooling)
+    print("filtered_building_ids_cooling ",filtered_buildings_cooling)
+    print("filtered_loads_usage_cooling ",filtered_loads_usage_cooling)
+    # heating filter 
+    filtered_buildings_heating = building_meta_df.apply(meets_conditions2, axis=1)
+
+    # Extract the Building ID CAAN values of buildings that meet the conditions
+    filtered_building_ids_heating = building_meta_df.loc[filtered_buildings_heating, "Building ID CAAN"].tolist()
+
+    # Filter cooling loads for buildings that meet the conditions
+    filtered_loads_usage_heating = allBldg_output[allBldg_output["Building ID CAAN"].isin(filtered_building_ids_heating)]
+
+    # DHW filter
+    filtered_buildings_DHW = building_meta_df.apply(meets_conditions3, axis=1)
+
+    # Extract the Building ID CAAN values of buildings that meet the conditions
+    filtered_building_ids_DHW = building_meta_df.loc[filtered_buildings_DHW, "Building ID CAAN"].tolist()
+
+    # Filter cooling loads for buildings that meet the conditions
+    filtered_loads_usage_DHW = allBldg_output[allBldg_output["Building ID CAAN"].isin(filtered_building_ids_DHW)]
+
+    # Other filter
+    filtered_buildings_other = building_meta_df.apply(meets_conditions4, axis=1)
+
+    # Extract the Building ID CAAN values of buildings that meet the conditions
+    filtered_building_ids_other = building_meta_df.loc[filtered_buildings_other, "Building ID CAAN"].tolist()
+
+    # Filter cooling loads for buildings that meet the conditions
+    filtered_loads_usage_other = allBldg_output[allBldg_output["Building ID CAAN"].isin(filtered_building_ids_other)]
+
+    # Sum the cooling loads across all hours for these buildings
+    if usage == "Load (kBtu)":
+        df[f"Current {type} Cooling {usage}"] = filtered_loads_usage_cooling.groupby(allBldg_output['Timestamp'])["Cooling Load (kbtu)"].sum()
+        df[f"Current {type} Heating {usage}"] = filtered_loads_usage_heating.groupby(allBldg_output['Timestamp'])["Heating Load (kbtu)"].sum()
+        df[f"Current {type} Hot Water {usage}"] = filtered_loads_usage_DHW.groupby(allBldg_output['Timestamp'])["Hot Water Load (kbtu)"].sum()
+        if type != "District":
+            df[f"Current {type} Cooking {usage}"] = filtered_loads_usage_other.groupby(allBldg_output['Timestamp'])["Cooking Load (kbtu)"].sum()
+            df[f"Current {type} Laundry {usage}"] = filtered_loads_usage_other.groupby(allBldg_output['Timestamp'])["Laundry Load (kbtu)"].sum()
+    else:
+        df[f"Current {type} Heating {usage}"] = filtered_loads_usage_heating.groupby(allBldg_output['Timestamp'])[f"Heating {units}"].sum()
+        df[f"Current {type} Hot Water {usage}"] = filtered_loads_usage_DHW.groupby(allBldg_output['Timestamp'])[f"Hot Water {units}"].sum()
+        df[f"Current {type} Cooking {usage}"] = filtered_loads_usage_other.groupby(allBldg_output['Timestamp'])[f"Cooking {units}"].sum()
+        df[f"Current {type} Laundry {usage}"] = filtered_loads_usage_other.groupby(allBldg_output['Timestamp'])[f"Laundry {units}"].sum()
+        df[f"Current {type} Other Process {usage}"] = filtered_loads_usage_other.groupby(allBldg_output['Timestamp'])[f"Other Process {units}"].sum()
+        if usage == "Electricity Use (kWh)":
+                df[f"Current {type} Cooling {usage}"] = filtered_loads_usage_cooling.groupby(allBldg_output['Timestamp'])["Cooling (kWh)"].sum()
 
 
-    def meets_new_building_other_conditions(row):
-        condition = (
-            year >= row["First Year Active"] and
-            year <= row["Last Year Active"] and
-            year >= row["Year of Cooking and Laundry Decarb"] 
-        )
-        return condition
+    # Reset the index to move timestamp back as a column and reset to default integer index
+    df.reset_index(inplace=True)
+    df["Ambient Air Wet Bulb Temp (F)"] = weather_df["Wet Bulb Temp (°F)"]
+    return df
+
+
+def filtered_bldg_differentBldgs(building_meta_df,allBldg_output,meets_conditions1,meets_conditions2,meets_conditions3,meets_conditions4,df,type,usage,units):
+    # cooling filter 
+    # Apply the condition check to filter buildings
+    filtered_buildings_cooling = building_meta_df.apply(meets_conditions1, axis=1)
+
+    # Extract the Building ID CAAN values of buildings that meet the conditions
+    filtered_building_ids_cooling = building_meta_df.loc[filtered_buildings_cooling, "Building ID CAAN"].tolist()
+
+    # Filter cooling loads for buildings that meet the conditions
+    filtered_loads_usage_cooling = allBldg_output[allBldg_output["Building ID CAAN"].isin(filtered_building_ids_cooling)]
+    print("type",type)
+    print("usage",usage)
+    print("filtered_building_ids_cooling ",filtered_building_ids_cooling)
+    print("filtered_building_ids_cooling ",filtered_buildings_cooling)
+    print("filtered_loads_usage_cooling ",filtered_loads_usage_cooling)
+    # heating filter 
+    filtered_buildings_heating = building_meta_df.apply(meets_conditions2, axis=1)
+
+    # Extract the Building ID CAAN values of buildings that meet the conditions
+    filtered_building_ids_heating = building_meta_df.loc[filtered_buildings_heating, "Building ID CAAN"].tolist()
+
+    # Filter cooling loads for buildings that meet the conditions
+    filtered_loads_usage_heating = allBldg_output[allBldg_output["Building ID CAAN"].isin(filtered_building_ids_heating)]
+
+    # DHW filter
+    filtered_buildings_DHW = building_meta_df.apply(meets_conditions3, axis=1)
+
+    # Extract the Building ID CAAN values of buildings that meet the conditions
+    filtered_building_ids_DHW = building_meta_df.loc[filtered_buildings_DHW, "Building ID CAAN"].tolist()
+
+    # Filter cooling loads for buildings that meet the conditions
+    filtered_loads_usage_DHW = allBldg_output[allBldg_output["Building ID CAAN"].isin(filtered_building_ids_DHW)]
+
+    # Other filter
+    filtered_buildings_other = building_meta_df.apply(meets_conditions4, axis=1)
+
+    # Extract the Building ID CAAN values of buildings that meet the conditions
+    filtered_building_ids_other = building_meta_df.loc[filtered_buildings_other, "Building ID CAAN"].tolist()
+
+    # Filter cooling loads for buildings that meet the conditions
+    filtered_loads_usage_other = allBldg_output[allBldg_output["Building ID CAAN"].isin(filtered_building_ids_other)]
+
+    if usage == "Load (kBtu)":
+        df[f"Current {type} Cooling {usage}"] = filtered_loads_usage_cooling["Cooling Load (kbtu)"]
+        df[f"Current {type} Heating {usage}"] = filtered_loads_usage_heating["Heating Load (kbtu)"]
+        df[f"Current {type} Hot Water {usage}"] = filtered_loads_usage_DHW["Hot Water Load (kbtu)"]
+        if type != "District":
+            df[f"Current {type} Cooking {usage}"] = filtered_loads_usage_other["Cooking Load (kbtu)"]
+            df[f"Current {type} Laundry {usage}"] = filtered_loads_usage_other["Laundry Load (kbtu)"]
+    else:
+        df[f"Current {type} Heating {usage}"] = filtered_loads_usage_heating[f"Heating {units}"]
+        df[f"Current {type} Hot Water {usage}"] = filtered_loads_usage_DHW[f"Hot Water {units}"]
+        df[f"Current {type} Cooking {usage}"] = filtered_loads_usage_other[f"Cooking {units}"]
+        df[f"Current {type} Laundry {usage}"] = filtered_loads_usage_other[f"Laundry {units}"]
+        df[f"Current {type} Other Process {usage}"] = filtered_loads_usage_other[f"Other Process {units}"]
+        if usage == "Electricity Use (kWh)":
+                df[f"Current {type} Cooling {usage}"] = filtered_loads_usage_cooling["Cooling (kWh)"].sum()
+
+
+    # Reset the index to move timestamp back as a column and reset to default integer index
+    df.reset_index(inplace=True)
+    df["Ambient Air Wet Bulb Temp (F)"] = weather_df["Wet Bulb Temp (°F)"]
+    return df
+
+current_district_therm_loads = filtered_bldg_sum(building_meta_df,allBldgLoads_output,meets_district_cooling_conditions,meets_district_heating_conditions,meets_district_DHW_conditions,meets_district_DHW_conditions,current_district_therm_loads, "District","Load (kBtu)","(kBtu)")
+
+
+
+################# bldg loads and usage #####################
+
+
+# empty frame
+current_bldg_therm_loads = pd.DataFrame()
+current_bldg_elec_use = pd.DataFrame()
+current_bldg_gas_use = pd.DataFrame()
+new_bldg_therm_loads = pd.DataFrame()
+
+
+########### building conditions #########################
+# Define a function to check conditions for each building
+def meets_building_cooling_conditions(row):
+    condition = (
+        year >= row["First Year Active"] and
+        year <= row["Last Year Active"] and
+        year < row["Year of Decarb"] and
+        row["Current District Cooling Y/N?"] == "N"
+    )
+    return condition
+
+# Define a function to check conditions for each building
+def meets_building_heating_conditions(row):
+    condition = (
+        year >= row["First Year Active"] and
+        year <= row["Last Year Active"] and
+        year < row["Year of Decarb"] and
+        row["Current District Heating Y/N?"] == "N"
+    )
+    return condition
+
+    # Define a function to check conditions for each building
+def meets_building_DHW_conditions(row):
+    condition = (
+        year >= row["First Year Active"] and
+        year <= row["Last Year Active"] and
+        year < row["Year of Decarb"] and
+        row["Current District Hot Water Y/N?"] == "N"
+    )
+    return condition
+
+def meets_building_other_conditions(row):
+    condition = (
+        year >= row["First Year Active"] and
+        year <= row["Last Year Active"] and
+        year < row["Year of Cooking and Laundry Decarb"] 
+    )
+    return condition
     
-    new_Bldg_Therm_Op_Loads=filtered_bldg(building_meta_df,allBldgLoads_output,meets_new_building_conditions,meets_new_building_conditions,meets_new_building_conditions,meets_new_building_other_conditions,new_bldg_therm_loads,"New Building Independent Heat Pump ","Load (kBtu)","(kBtu)")
+print("allBldgGasUse_output",allBldgGasUse_output)
+current_Bldg_Therm_Op_Loads=filtered_bldg_differentBldgs(building_meta_df,allBldgLoads_output,meets_building_cooling_conditions,meets_building_heating_conditions,meets_building_DHW_conditions,meets_building_other_conditions,current_bldg_therm_loads,"Building Equipment","Load (kBtu)","(kBtu)")
+Current_Bldg_Equip_Elec_Use=filtered_bldg_differentBldgs(building_meta_df,allBldgElecUse_output,meets_building_cooling_conditions,meets_building_heating_conditions,meets_building_DHW_conditions,meets_building_other_conditions,current_bldg_elec_use, "Building Equipment","Electricity Use (kWh)","(kWh)")
+Current_Bldg_Equip_Gas_Use=filtered_bldg_differentBldgs(building_meta_df,allBldgGasUse_output,meets_building_cooling_conditions,meets_building_heating_conditions,meets_building_DHW_conditions,meets_building_other_conditions,current_bldg_gas_use, "Building Equipment","Gas Use (therms)","(Therms)")
 
 
+############
+# Define a function to check conditions for each building
+def meets_new_building_conditions(row):
+    condition = (
+        year >= row["First Year Active"] and
+        year <= row["Last Year Active"] and
+        year >= row["Year of Decarb"] and
+        row["Decarbonization Type (New Building Heat Pumps vs. New CUP)"] == "New Building Heat Pumps"
+    )
+    return condition
 
 
-    ######################## wet bulb / COP regression #######################
+def meets_new_building_other_conditions(row):
+    condition = (
+        year >= row["First Year Active"] and
+        year <= row["Last Year Active"] and
+        year >= row["Year of Cooking and Laundry Decarb"] 
+    )
+    return condition
 
-    calculation_map_COP_wetbulb = pd.read_excel("UCSB Calculation Map.xlsx",sheet_name="Reg. Data - Current District",header =1)
+new_Bldg_Therm_Op_Loads=filtered_bldg_differentBldgs(building_meta_df,allBldgLoads_output,meets_new_building_conditions,meets_new_building_conditions,meets_new_building_conditions,meets_new_building_other_conditions,new_bldg_therm_loads,"New Building Independent Heat Pump","Load (kBtu)","(kBtu)")
 
 
-    def COP_wetbulb_reg(COP_wetbulb_reg_output,subset_training_data):
-            # Define conditions for COP calculation based on wet bulb temperature
-            COP_wetbulb_reg_output["Current District Cooling COP"] = np.where(
-                (COP_wetbulb_reg_output["Current District Wet Bulb (F)"] <= 68),
-                6,
-                np.where(
-                    COP_wetbulb_reg_output["Current District Wet Bulb (F)"] >= 78,
-                    3,
-                    np.nan  # Placeholder for values between 68 and 78 (handled in regression)
-                )
+######################## wet bulb / COP regression #######################
+
+calculation_map_COP_wetbulb = pd.read_excel("UCSB Calculation Map.xlsx",sheet_name="Reg. Data - Current District",header =1)
+
+
+def COP_wetbulb_reg(COP_wetbulb_reg_output,subset_training_data):
+        # Define conditions for COP calculation based on wet bulb temperature
+        COP_wetbulb_reg_output["Current District Cooling COP"] = np.where(
+            (COP_wetbulb_reg_output["Current District Wet Bulb (F)"] <= 68),
+            6,
+            np.where(
+                COP_wetbulb_reg_output["Current District Wet Bulb (F)"] >= 78,
+                3,
+                np.nan  # Placeholder for values between 68 and 78 (handled in regression)
             )
+        )
 
-            # Filter the range of wet bulb temperatures for regression (between 68 and 78)
-            mask = (COP_wetbulb_reg_output["Current District Wet Bulb (F)"] > 68) & (
-                COP_wetbulb_reg_output["Current District Wet Bulb (F)"] < 78)
+        # Filter the range of wet bulb temperatures for regression (between 68 and 78)
+        mask = (COP_wetbulb_reg_output["Current District Wet Bulb (F)"] > 68) & (
+            COP_wetbulb_reg_output["Current District Wet Bulb (F)"] < 78)
+        
+
+        wet_bulb_temps_subset = COP_wetbulb_reg_output.loc[mask, "Current District Wet Bulb (F)"]
+
+        if not wet_bulb_temps_subset.empty:
+            # Prepare data for regression (subset from calculation map)
+            X = sm.add_constant(subset_training_data['Current District Wet Bulb (F)'])
+            y = subset_training_data['Current District Cooling COP']
+
+            # Fit OLS regression model
+            model = sm.OLS(y, X).fit()
+
+            # Generate a range of Wet Bulb Temperature values for prediction
+            new_wet_bulb_temps = np.arange(wet_bulb_temps_subset.min(), wet_bulb_temps_subset.max() + 1)
             
+            # Add constant term to the new values for prediction
+            X_new = sm.add_constant(new_wet_bulb_temps)
+            # print("jjjjjjjjj",new_wet_bulb_temps,X_new)
+            # Predict Cooling COP for the new values using the fitted model
+            predicted_cooling_cop_new = model.predict(X_new)
 
-            wet_bulb_temps_subset = COP_wetbulb_reg_output.loc[mask, "Current District Wet Bulb (F)"]
+            # Update output DataFrame with predicted COP values
+            COP_wetbulb_reg_output.loc[mask, "Current District Cooling COP"] = predicted_cooling_cop_new
 
-            if not wet_bulb_temps_subset.empty:
-                # Prepare data for regression (subset from calculation map)
-                X = sm.add_constant(subset_training_data['Current District Wet Bulb (F)'])
-                y = subset_training_data['Current District Cooling COP']
+            # Display model summary
+            # print(model.summary())
 
-                # Fit OLS regression model
-                model = sm.OLS(y, X).fit()
+        return COP_wetbulb_reg_output
 
-                # Generate a range of Wet Bulb Temperature values for prediction
-                new_wet_bulb_temps = np.arange(wet_bulb_temps_subset.min(), wet_bulb_temps_subset.max() + 1)
-                
-                # Add constant term to the new values for prediction
-                X_new = sm.add_constant(new_wet_bulb_temps)
-                # print("jjjjjjjjj",new_wet_bulb_temps,X_new)
-                # Predict Cooling COP for the new values using the fitted model
-                predicted_cooling_cop_new = model.predict(X_new)
 
-                # Update output DataFrame with predicted COP values
-                COP_wetbulb_reg_output.loc[mask, "Current District Cooling COP"] = predicted_cooling_cop_new
+# Subset the training data based on wet bulb temperature range
+subset_training_data = calculation_map_COP_wetbulb[
+    (calculation_map_COP_wetbulb['Current District Wet Bulb (F)'] > 67) &
+    (calculation_map_COP_wetbulb['Current District Wet Bulb (F)'] < 79)
+]
 
-                # Display model summary
-                # print(model.summary())
 
-            return COP_wetbulb_reg_output
+COP_wetbulb_reg_output = pd.DataFrame()
+COP_wetbulb_reg_output["Current District Wet Bulb (F)"] = range(24,91)
 
-    
-    # Subset the training data based on wet bulb temperature range
-    subset_training_data = calculation_map_COP_wetbulb[
-        (calculation_map_COP_wetbulb['Current District Wet Bulb (F)'] > 67) &
-        (calculation_map_COP_wetbulb['Current District Wet Bulb (F)'] < 79)
-    ]
+# Apply the COP regression function to calculate Cooling COP
+COP_wetbulb_reg_output = COP_wetbulb_reg(COP_wetbulb_reg_output,subset_training_data)
 
 
 
-    COP_wetbulb_reg_output = pd.DataFrame()
-    COP_wetbulb_reg_output["Current District Wet Bulb (F)"] = range(24,91)
-
-    # Apply the COP regression function to calculate Cooling COP
-    COP_wetbulb_reg_output = COP_wetbulb_reg(COP_wetbulb_reg_output,subset_training_data)
+##################### Current District Elec use ###############################
 
 
+#empty frame
+current_District_Elec_Use = pd.DataFrame()
+# Round and convert to integer for temperature comparison
+rounded_weather_temps = weather_df["Wet Bulb Temp (°F)"].round().astype(int)
+wet_bulb_temps = COP_wetbulb_reg_output["Current District Wet Bulb (F)"]
 
-    ##################### Current District Elec use ###############################
+# Find the index of the closest wet bulb temperature for each weather temperature
+closest_indices = np.abs(wet_bulb_temps.values[:, None] - rounded_weather_temps.values).argmin(axis=0)
 
-    #empty frame
-    current_District_Elec_Use = pd.DataFrame()
-    # Round and convert to integer for temperature comparison
-    rounded_weather_temps = weather_df["Wet Bulb Temp (°F)"].round().astype(int)
-    wet_bulb_temps = COP_wetbulb_reg_output["Current District Wet Bulb (F)"]
+# Use the closest indices to retrieve corresponding COP values
+assigned_cop_values = COP_wetbulb_reg_output["Current District Cooling COP"].iloc[closest_indices].reset_index(drop=True)
 
-    # Find the index of the closest wet bulb temperature for each weather temperature
-    closest_indices = np.abs(wet_bulb_temps.values[:, None] - rounded_weather_temps.values).argmin(axis=0)
+# Assign the assigned COP values to the original DataFrame
+current_District_Elec_Use["Current District Cooling COP_WB"] = assigned_cop_values
 
-    # Use the closest indices to retrieve corresponding COP values
-    assigned_cop_values = COP_wetbulb_reg_output["Current District Cooling COP"].iloc[closest_indices].reset_index(drop=True)
-
-    # Assign the assigned COP values to the original DataFrame
-    current_District_Elec_Use["Current District Cooling COP_WB"] = assigned_cop_values
-
-
-    current_District_Elec_Use["Current District System Cooling Electricity Use (kWh)"] = current_district_therm_loads["Current District Cooling Load (kBtu)"]/current_District_Elec_Use["Current District Cooling COP_WB"]
+current_District_Elec_Use["Current District System Cooling Electricity Use (kWh)"] = current_district_therm_loads["Current District Cooling Load (kBtu)"]/current_District_Elec_Use["Current District Cooling COP_WB"]
 
 
 
-   ############################ Current District Gas use ###############################
+############################ Current District Gas use ###############################
 
-    current_District_Gas_Use= pd.DataFrame()
+current_District_Gas_Use= pd.DataFrame()
 
-    district_HW_COP = calculation_map_COP_wetbulb['Current District Heating COP'][0]
-    district_DHW_COP =calculation_map_COP_wetbulb['Current District Hot Water COP'][0]
+district_HW_COP = calculation_map_COP_wetbulb['Current District Heating COP'][0]
+district_DHW_COP =calculation_map_COP_wetbulb['Current District Hot Water COP'][0]
 
-    current_District_Gas_Use["Current District System Heating Gas Use (therms)"] = current_district_therm_loads["Current District Heating Load (kBtu)"]/district_HW_COP
-    current_District_Gas_Use["Current District System Hot Water Gas Use (therms)"] = current_district_therm_loads["Current District Hot Water Load (kBtu)"]/district_DHW_COP
+current_District_Gas_Use["Current District System Heating Gas Use (therms)"] = current_district_therm_loads["Current District Heating Load (kBtu)"]/district_HW_COP
+current_District_Gas_Use["Current District System Hot Water Gas Use (therms)"] = current_district_therm_loads["Current District Hot Water Load (kBtu)"]/district_DHW_COP
 
 
 
 ######################## new bldg regression #######################
 
-    calculation_map_hpCOP_drybulb = pd.read_excel("UCSB Calculation Map.xlsx",sheet_name="Reg. Data - New Bldg Equip",header =1)
+calculation_map_hpCOP_drybulb = pd.read_excel("UCSB Calculation Map.xlsx",sheet_name="Reg. Data - New Bldg Equip",header =1)
 
 
-    def COP_dryBulb_newEquip_reg(COP_newBldgEquip_reg_output,subset_training_data):
+def COP_dryBulb_newEquip_reg(subset_training_data,column):
+
+            COP_newBldgEquip_reg_output= pd.DataFrame()
+            # Prepare data for regression (subset from calculation map)
+            X = sm.add_constant(subset_training_data['Ambient Air Dry Bulb Temp (F)'])
+            y = subset_training_data[column]
+
+            # Fit OLS regression model
+            model = sm.OLS(y, X).fit()
+
+            # Generate a range of Wet Bulb Temperature values for prediction
+            new_dry_bulb_temps = np.arange(subset_training_data['Ambient Air Dry Bulb Temp (F)'].min(), subset_training_data['Ambient Air Dry Bulb Temp (F)'].max() + 1)
+
+            COP_newBldgEquip_reg_output["Ambient Air Dry Bulb Temp (F)"] = pd.Series(new_dry_bulb_temps)
+            # Add constant term to the new values for prediction
+            X_new = sm.add_constant(new_dry_bulb_temps)
+
+            # print("jjjjjjjjj",new_wet_bulb_temps,X_new)
+            # Predict Cooling COP for the new values using the fitted model
+            predicted_cooling_cop_new = model.predict(X_new)
 
 
-                # Prepare data for regression (subset from calculation map)
-                X = sm.add_constant(subset_training_data['Ambient Air Dry Bulb Temp (F)'])
-                y = subset_training_data['New Building Independent Heat Pump - Cooling COP (44°F CHWST)']
+            # Update output DataFrame with predicted COP values
+            COP_newBldgEquip_reg_output[column] = predicted_cooling_cop_new
 
-                # Fit OLS regression model
-                model = sm.OLS(y, X).fit()
+            # Display model summary
+            # print(model.summary())
 
-                # Generate a range of Wet Bulb Temperature values for prediction
-                new_dry_bulb_temps = np.arange(subset_training_data['Ambient Air Dry Bulb Temp (F)'].min(), subset_training_data['Ambient Air Dry Bulb Temp (F)'].max() + 1)
-                print("new_dry_bulb_temps",new_dry_bulb_temps)
-                # Add constant term to the new values for prediction
-                X_new = sm.add_constant(new_dry_bulb_temps)
-                print("X_new",X_new)
-                # print("jjjjjjjjj",new_wet_bulb_temps,X_new)
-                # Predict Cooling COP for the new values using the fitted model
-                predicted_cooling_cop_new = model.predict(X_new)
-                print("predicted_cooling_cop_new",predicted_cooling_cop_new)
+            return COP_newBldgEquip_reg_output
 
-                # Update output DataFrame with predicted COP values
-                COP_newBldgEquip_reg_output["New Building Independent Heat Pump - Cooling COP (44°F CHWST)"] = predicted_cooling_cop_new
+## subset 1 ##
+# Subset the training data based on wet bulb temperature range
+subset_training_data_hpCOP = calculation_map_hpCOP_drybulb[(calculation_map_hpCOP_drybulb['Ambient Air Dry Bulb Temp (F)'] > 49)]
 
-                # Display model summary
-                # print(model.summary())
+# Drop rows with NaN in the specified column only
+subset_training_data_hpCOP_cleaned = subset_training_data_hpCOP.dropna(subset=['New Building Independent Heat Pump - Cooling COP (44°F CHWST)'])
 
-                return COP_newBldgEquip_reg_output
+## subset 2 ##
+# Subset the training data based on wet bulb temperature range
+subset_training_data_hpHCOP = calculation_map_hpCOP_drybulb[(calculation_map_hpCOP_drybulb['Ambient Air Dry Bulb Temp (F)'] <= 65)]
 
-    
-    # Subset the training data based on wet bulb temperature range
-    subset_training_data_hpCOP = calculation_map_hpCOP_drybulb[(calculation_map_hpCOP_drybulb['Ambient Air Dry Bulb Temp (F)'] > 49)]
-    # Remove rows with missing values from subset_training_data
-    # Drop rows with NaN in the specified column only
-    subset_training_data_hpCOP_cleaned = subset_training_data_hpCOP.dropna(subset=['New Building Independent Heat Pump - Cooling COP (44°F CHWST)'])
-    print("subset_training_data_hpCOP",subset_training_data_hpCOP_cleaned)
+# Drop rows with NaN in the specified column only
+subset_training_data_hpHCOP_cleaned = subset_training_data_hpHCOP.dropna(subset=['New Building Independent Heat Pump - Heating COP (170°F HWST)'])
 
-    COP_newBldgEquip_reg_output = pd.DataFrame()
-    COP_newBldgEquip_reg_output["Ambient Air Dry Bulb Temp (F)"] = range(50,101)
 
-    # Apply the COP regression function to calculate Cooling COP
-    COP_newBldgEquip_reg_output = COP_dryBulb_newEquip_reg(COP_newBldgEquip_reg_output,subset_training_data_hpCOP_cleaned)
+## subset 3 ##
+# Subset the training data based on wet bulb temperature range
+subset_training_data_hpDHWCOP = calculation_map_hpCOP_drybulb[(calculation_map_hpCOP_drybulb['Ambient Air Dry Bulb Temp (F)'] <= 80)]
+
+# Drop rows with NaN in the specified column only
+subset_training_data_hpDHWCOP_cleaned = subset_training_data_hpDHWCOP.dropna(subset=['New Building Independent Heat Pump - Hot Water COP'])
 
 
 
+# COP_newBldgEquip_reg_output_1 = pd.DataFrame()
+# COP_newBldgEquip_reg_output_2 =pd.DataFrame()
+# COP_newBldgEquip_reg_output_3 =pd.DataFrame()
+# COP_newBldgEquip_reg_output_4 =pd.DataFrame()
+# COP_newBldgEquip_reg_output_1["Ambient Air Dry Bulb Temp (F)"] = range(50,101)
+# COP_newBldgEquip_reg_output_2["Ambient Air Dry Bulb Temp (F)"] = range(40,66)
+# COP_newBldgEquip_reg_output_3["Ambient Air Dry Bulb Temp (F)"] = range(40,66)
+# COP_newBldgEquip_reg_output_4["Ambient Air Dry Bulb Temp (F)"] = range(40,66)
+
+# Apply the COP regression function to calculate Cooling COP
+COP_newBldgEquip_reg_output_1 = COP_dryBulb_newEquip_reg(subset_training_data_hpCOP_cleaned,'New Building Independent Heat Pump - Cooling COP (44°F CHWST)')
+COP_newBldgEquip_reg_output_2 = COP_dryBulb_newEquip_reg(subset_training_data_hpHCOP_cleaned,'New Building Independent Heat Pump - Heating COP (170°F HWST)')
+COP_newBldgEquip_reg_output_3 = COP_dryBulb_newEquip_reg(subset_training_data_hpDHWCOP_cleaned,'New Building Independent Heat Pump - Hot Water COP')
+COP_newBldgEquip_reg_output_4 = COP_dryBulb_newEquip_reg(calculation_map_hpCOP_drybulb,'New Building Cooking COP')
+COP_newBldgEquip_reg_output_5 = COP_dryBulb_newEquip_reg(calculation_map_hpCOP_drybulb,'New Building Laundry COP')
+
+# List of DataFrame objects to be merged
+dfs_to_merge = [
+    COP_newBldgEquip_reg_output_1,
+    COP_newBldgEquip_reg_output_2,
+    COP_newBldgEquip_reg_output_3,
+    COP_newBldgEquip_reg_output_4,
+    COP_newBldgEquip_reg_output_5
+]
+
+# Define the common key column for merging
+key_column = 'Ambient Air Dry Bulb Temp (F)'
+
+# Use functools.reduce() with pd.merge() to merge all DataFrames in the list
+COP_newBldgEquip_reg_output = reduce(lambda left, right: pd.merge(left, right, on=key_column, how='outer'), dfs_to_merge)
+
+
+##################### New Bldg equipment Elec use ###############################
+
+########## change to many bldgs ##############
+
+
+def cop_column(rounded_dryBulb_temps,dry_bulb_temps,COP_newBldgEquip_reg_output,column,loads_len):
+        # Find the index of the closest wet bulb temperature for each weather temperature
+        closest_indices_2 = np.abs(dry_bulb_temps.values[:, None] - rounded_dryBulb_temps.values).argmin(axis=0)
+
+        # Use the closest indices to retrieve corresponding COP values
+        assigned_cooling_cop_values = COP_newBldgEquip_reg_output[column].iloc[closest_indices_2].reset_index(drop=True)
+
+        
+        # Determine the length of each segment (8760)
+        segment_length = len(assigned_cooling_cop_values)
+
+        # Calculate the number of complete cycles
+        num_cycles = loads_len // segment_length
+
+        # Repeat COP values to match the length of load values
+        cop_repeated = np.tile(assigned_cooling_cop_values, num_cycles)
+
+        return cop_repeated
+
+     
 
 
 
 
+#empty frame
+new_bldg_equip_elec_Use = pd.DataFrame()
+# Round and convert to integer for temperature comparison
+rounded_dryBulb_temps = weather_df["Dry Bulb Temp (°F)"].round().astype(int)
+dry_bulb_temps = COP_newBldgEquip_reg_output["Ambient Air Dry Bulb Temp (F)"]
+
+#assiging cooling COP
+new_bldg_equip_elec_Use["Current New Bldg Cooling COP_DB"] = cop_column(rounded_dryBulb_temps,dry_bulb_temps,COP_newBldgEquip_reg_output,"New Building Independent Heat Pump - Cooling COP (44°F CHWST)",new_Bldg_Therm_Op_Loads.shape[0])
+#cooling load to usage
+new_bldg_equip_elec_Use["New Building Independent Heat Pump Cooling Electricity Use"] = new_Bldg_Therm_Op_Loads["Current New Building Independent Heat Pump Cooling Load (kBtu)"]/new_bldg_equip_elec_Use["Current New Bldg Cooling COP_DB"]
+
+# # Use the closest indices to retrieve corresponding COP values
+# assigned_heating_cop_values = COP_newBldgEquip_reg_output["New Building Independent Heat Pump - Heating COP (170°F HWST)"].iloc[closest_indices].reset_index(drop=True)
+
+# # Assign the assigned COP values to the original DataFrame
+# new_bldg_equip_elec_Use["Current New Bldg Heating COP_WB"] = assigned_heating_cop_values
+
+#assiging heating COP
+new_bldg_equip_elec_Use["Current New Bldg Heating COP_DB"] = cop_column(rounded_dryBulb_temps,dry_bulb_temps,COP_newBldgEquip_reg_output,"New Building Independent Heat Pump - Heating COP (170°F HWST)",new_Bldg_Therm_Op_Loads.shape[0])
+#heating load to usage
+new_bldg_equip_elec_Use["New Building Independent Heat Pump Heating Electricity Use (kWh)"] = new_Bldg_Therm_Op_Loads["Current New Building Independent Heat Pump Heating Load (kBtu)"]/new_bldg_equip_elec_Use["Current New Bldg Heating COP_DB"]
+
+#assiging hot water COP
+new_bldg_equip_elec_Use["Current New Bldg Hot water COP_DB"] = cop_column(rounded_dryBulb_temps,dry_bulb_temps,COP_newBldgEquip_reg_output,"New Building Independent Heat Pump - Hot Water COP",new_Bldg_Therm_Op_Loads.shape[0])
+#hot water  to usage
+new_bldg_equip_elec_Use["New Building Independent Heat Pump Hot Water Electricity Use (kWh)"] = new_Bldg_Therm_Op_Loads["Current New Building Independent Heat Pump Hot Water Load (kBtu)"]/new_bldg_equip_elec_Use["Current New Bldg Hot water COP_DB"]
 
 
+#assiging cooking COP
+new_bldg_equip_elec_Use["Current New Bldg Cooking COP_DB"] = cop_column(rounded_dryBulb_temps,dry_bulb_temps,COP_newBldgEquip_reg_output,"New Building Cooking COP",new_Bldg_Therm_Op_Loads.shape[0])
+#cooking to usage
+new_bldg_equip_elec_Use["New Building Equipment Cooking Electricity Use (kWh)"] = new_Bldg_Therm_Op_Loads["Current New Building Independent Heat Pump Cooking Load (kBtu)"]/new_bldg_equip_elec_Use["Current New Bldg Cooking COP_DB"]
+
+#assiging laundry COP
+new_bldg_equip_elec_Use["Current New Bldg Laundry COP_DB"] = cop_column(rounded_dryBulb_temps,dry_bulb_temps,COP_newBldgEquip_reg_output,"New Building Laundry COP",new_Bldg_Therm_Op_Loads.shape[0])
+#laundry to usage
+new_bldg_equip_elec_Use["New Building Equipment Laundry Electricity Use (kWh)"] = new_Bldg_Therm_Op_Loads["Current New Building Independent Heat Pump Laundry Load (kBtu)"]/new_bldg_equip_elec_Use["Current New Bldg Laundry COP_DB"]
+
+######### newCUP ####################
+
+new_CUP_therm_loads =pd.DataFrame()
+
+# Define a function to check conditions for each building
+def meets_new_CUP_conditions(row):
+    condition = (
+        year >= row["First Year Active"] and
+        year <= row["Last Year Active"] and
+        year >= row["Year of Decarb"] and
+        row["Decarbonization Type (New Building Heat Pumps vs. New CUP)"] == "New CUP"
+    )
+    return condition
 
 
-
+new_CUP_Therm_Loads=filtered_bldg_differentBldgs(building_meta_df,allBldgLoads_output,meets_new_CUP_conditions,meets_new_CUP_conditions,meets_new_CUP_conditions,meets_new_CUP_conditions,new_CUP_therm_loads,"New CUP","Load (kBtu)","(kBtu)")
 
 
 
