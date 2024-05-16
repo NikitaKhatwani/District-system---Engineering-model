@@ -228,7 +228,7 @@ class heatPump(BaseModel):
         HW_indices = np.where(self.month_to_match[:, None] == self.gr_months.values )[1]
         # print("llll",HW_indices)
         #Get the corresponding value from hotWaterSetpoint column
-        return (self.grReturn_D_LWT[HW_indices]+0.0001).reset_index(drop=True)
+        return (self.grReturn_HtRej_LWT[HW_indices]+0.0001).reset_index(drop=True)
     
 
     @computed_field(return_type=MySeries)
@@ -484,7 +484,7 @@ class heatPump(BaseModel):
     @computed_field(return_type=MySeries)
     @property
     def CTapproach(self):
-        # print("self.CT_CUP_month.values",self.CT_CUP_month.values)
+        print("self.CT_CUP_month.values",self.CT_CUP_month.values)
         HW_indices = np.where(self.month_to_match[:, None] == self.CT_CUP_month.values )[1]
         print("HW_indices",HW_indices)
         self.CT_CUP_value = self.CT_CUP_value.reset_index(drop=True)
@@ -944,7 +944,7 @@ class heatPump(BaseModel):
         
         # Find the index where month matches
         HW_indices = np.where(self.month_to_match[:, None] == self.gr_months.values )[1]
-        # print("HW_indices",HW_indices)
+        print("HW_indices",HW_indices)
         #Get the corresponding value from hotWaterSetpoint column
         result_series =  self.grReturn_HtEx_EWT[HW_indices].reset_index(drop=True)
 
